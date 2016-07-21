@@ -1,4 +1,4 @@
-package org.phoenixinitiative.core.repositories
+package org.phoenix.core.repositories
 
 import slick.driver.JdbcProfile
 
@@ -30,7 +30,7 @@ trait H2DBComponent extends DBComponent {
  
   import driver.api._
  
-  val h2Url = "jdbc:h2:mem:test1"
+  val h2Url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1"
  
   val db: Database = Database.forURL(url = h2Url, driver = "org.h2.Driver")
  

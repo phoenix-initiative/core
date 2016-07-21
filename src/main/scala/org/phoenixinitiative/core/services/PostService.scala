@@ -1,4 +1,4 @@
-package org.phoenixinitiative.core.services
+package org.phoenix.core.services
 
-import org.phoenixinitiative.core.repositories
+import org.phoenix.core.repositories._
 

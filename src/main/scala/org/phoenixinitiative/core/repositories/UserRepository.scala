@@ -1,6 +1,9 @@
-package org.phoenixinitiative.core.repositories
+package org.phoenix.core.repositories
 
-import scala.concurrent.{ExecutionContext, Future}
+import com.typesafe.scalalogging.LazyLogging
+import scala.concurrent._
+import scala.concurrent.duration._
+import scala.util.{Success, Failure}
 
 /** A User account
  *
@@ -28,7 +31,7 @@ case class User(
 /** A Database table for users
  *  Extends DBComponent to gain access to slick api and DB
  */
-trait UserRepositoryComponent { this: DBComponent =>
+trait UserRepositoryComponent { this: DBComponent with LazyLogging =>
 
   // Get the slick api from DBComponent
   import driver.api._
@@ -48,15 +51,31 @@ trait UserRepositoryComponent { this: DBComponent =>
 
   val users = TableQuery[Users]
 
-  private val usersAutoInc = users returning users.map(_.id)
+  class UserRepository(){
 
-  class UserRepository(users: TableQuery[Users]){
+    // Blocking function to ensure that the db has the schema for other calls
+    def createTable() = {
+      // Block with await
+      val result = Await.ready(db.run(users.schema.create), 5 seconds).value.get
+
+      // Log error or success
+      result match {
+        case Success(value) => logger.debug("user schema created")
+        case Failure(e) => logger.error(e.getStackTrace.mkString("\n"))
+      }
+    }
+
+    def getAllUsers(): Future[Seq[User]] = db.run(users.result)
 
     def getUserById(id: Long): Future[Option[User]] = db.run(users.filter(_.id === id).result.headOption)
+
   
     def getUserByUsername(username: String): Future[Option[User]] = db.run(users.filter(_.username === username).result.headOption)
   
-    def createUser(user: User): Future[User] = db.run(users returning users += user)
+    def createUser(user: User): Future[User] = db.run(
+      (users returning users.map(_.id)
+        into ((user, id) => user.copy(id = id))
+      ) += user)
   
     def deleteUser(id: Long): Future[Int] = db.run(users.filter(_.id === id).delete)
   
