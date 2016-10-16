@@ -30,7 +30,7 @@ trait H2DBComponent extends DBComponent {
  
   import driver.api._
  
-  val h2Url = "jdbc:h2:mem:test;DB_CLOSE_DELAY=-1"
+  val h2Url = "jdbc:h2:mem:test;DATABASE_TO_UPPER=false;DB_CLOSE_DELAY=-1"
  
   val db: Database = Database.forURL(url = h2Url, driver = "org.h2.Driver")
  

@@ -8,7 +8,9 @@ scalaVersion := "2.11.8"
 
 libraryDependencies ++= Seq(
   "com.typesafe.akka" %% "akka-actor" % "2.4.4",
-  "com.typesafe.akka" %% "akka-http-experimental" % "2.4.8",
+  "com.typesafe.akka" %% "akka-http-experimental" % "2.4.9",
+  "com.typesafe.akka" %% "akka-http-spray-json-experimental" % "2.4.9",
+  "io.spray" %%  "spray-json" % "1.3.2",
   "com.typesafe.slick" %% "slick" % "3.1.1",
   "com.h2database" % "h2" % "1.3.170",
   "org.scalactic" %% "scalactic" % "2.2.6",
@@ -19,5 +21,5 @@ libraryDependencies ++= Seq(
 
 enablePlugins(JavaServerAppPackaging)
 
-mainClass in Compile := Some("org.phoenixinitiative.core.Main")
+mainClass in Compile := Some("org.phoenix.core.Main")
 

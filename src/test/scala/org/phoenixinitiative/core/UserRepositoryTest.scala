@@ -5,14 +5,15 @@ import org.scalatest.concurrent.ScalaFutures
 
 import org.phoenix.core.repositories._
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent._
+import scala.concurrent.duration._
 import ExecutionContext.Implicits.global
 import scala.util.{Success, Failure}
 
-class UserRepositorySpec extends UnitSpec with ScalaFutures{
-  "A UserRepository" should "create users" in {
+class UserRepositorySpec extends UnitSpec with ScalaFutures {
 
-    val scott = User(
+  // Some test users
+  val scott = User(
       username="scotthansen",
       name="Scott Hansen",
       slug="scott-hansen",
@@ -42,46 +43,89 @@ class UserRepositorySpec extends UnitSpec with ScalaFutures{
       authLevel=2
     )
 
-    // Check everything but id as id comes from db insertion
-    def userCheck(original: User, inserted: User) {
-      original.username should be (inserted.username)
-      original.name should be (inserted.name)
-      original.slug should be (inserted.slug)
-      original.bio should be (inserted.bio)
-      original.email should be (inserted.email)
-      original.hashedPassword should be (inserted.hashedPassword)
-      original.authLevel should be (inserted.authLevel)
+    // Set for easy use
+    val testUsers = Set(scott, keith, erlich)
+ 
 
-      // Make sure db created and returned an id for the user
-      assert(inserted.id.isDefined)
+  "A UserRepository" should "create single users with createUser" in {
+    
+    // Initialize db with blocking schema creation call
+    DAL.userRepository.createTable()
+
+    // Create three users individually
+    Await.ready(DAL.userRepository.createUser(scott), 2 seconds)
+
+    Await.ready(DAL.userRepository.createUser(keith), 2 seconds)
+
+    Await.ready(DAL.userRepository.createUser(erlich), 2 seconds)
+
+    // Check if created users are returned correctly
+    ScalaFutures.whenReady(DAL.userRepository.getAllUsers()) { dbusers =>
+      // Compare using sets b/c order does not matter
+      dbusers.toSet should equal (testUsers)
     }
+
+    // Clean up db by deleting table
+    DAL.userRepository.deleteTable()
+
+    // Should fal
+    //val result = Await.ready(DAL.userRepository.createUser(scott), 2 seconds)
+    //assert(result.isInstanceOf[Failure[Any]])
+ 
+  }
+
+  it should "create multiple users with createUsers" in {
 
     // Initialize db with blocking schema creation call
     DAL.userRepository.createTable()
 
-    // Check individual users are inserted and returned with id
-    ScalaFutures.whenReady(DAL.userRepository.createUser(scott)) { user =>
-      userCheck(scott, user)
-    }
-
-    ScalaFutures.whenReady(DAL.userRepository.createUser(keith)) { user =>
-      userCheck(keith, user)
-    }
-    ScalaFutures.whenReady(DAL.userRepository.createUser(erlich)) { user =>
-      userCheck(erlich, user)
-    }
-
+    // Create three users
+    Await.ready(DAL.userRepository.createUsers(testUsers.toSeq), 2 seconds)
+ 
     // Check if created users are returned correctly
     ScalaFutures.whenReady(DAL.userRepository.getAllUsers()) { dbusers =>
-      val users: List[User] = List(scott, keith, erlich)
-      for (dbuser <- dbusers) {
-        // find user by username b/c no ids in test users
-        val testuser =  users.filter(u => (u.username == dbuser.username))(0)
-        userCheck(testuser, dbuser)
-      
+      // Compare using sets b/c order does not matter
+      dbusers.toSet should equal (testUsers)
+    }
+
+    // Clean up db by deleting table
+    DAL.userRepository.deleteTable()
+  }
+
+  it should "retrieve users by slug and id" in {
+    // Initialize db with blocking schema creation call
+    DAL.userRepository.createTable()
+
+    // Create three users
+    Await.ready(DAL.userRepository.createUsers(testUsers.toSeq), 2 seconds)
+
+    // Perform id checks
+    def checkGetById(user: User) {
+      ScalaFutures.whenReady(
+        DAL.userRepository.getUserById(user.uuid)
+      ) { dbuser =>
+        dbuser.get should equal (user)
       }
     }
 
+    // Perform username checks
+    def checkGetByUsername(user: User) {
+      ScalaFutures.whenReady(
+        DAL.userRepository.getUserByUsername(user.username)
+      ) { dbuser =>
+        dbuser.get should equal (user)
+      }
+    }
+ 
+    testUsers.map((testUser: User) => {
+        checkGetById(testUser)
+        checkGetByUsername(testUser)
+    })
+
+    // Clean up db by deleting table
+    DAL.userRepository.deleteTable()
+ 
+  
   }
 
 }

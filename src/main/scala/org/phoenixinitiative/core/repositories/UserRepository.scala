@@ -4,11 +4,12 @@ import com.typesafe.scalalogging.LazyLogging
 import scala.concurrent._
 import scala.concurrent.duration._
 import scala.util.{Success, Failure}
+import java.util.UUID
 
 /** A User account
  *
  *  @constructor create a new User
- *  @param id numerical id for user
+ *  @param uuid numerical id for user
  *  @param username login username of user
  *  @param name full name of user
  *  @param slug url version of name
@@ -18,7 +19,7 @@ import scala.util.{Success, Failure}
  *  @param authLevel level of authority 0-2
  */
 case class User(
-  id: Option[Long] = None,
+  uuid: UUID = UUID.randomUUID(),
   username: String,
   hashedPassword: String,
   name: String,
@@ -37,16 +38,16 @@ trait UserRepositoryComponent { this: DBComponent with LazyLogging =>
   import driver.api._
 
   class Users(tag: Tag) extends Table[User](tag, "USERS"){
-    def id = column[Option[Long]]("ID", O.PrimaryKey, O.AutoInc)
-    def username = column[String]("USERNAME")
-    def hashedPassword = column[String]("HASHED_PASSWORD")
-    def name = column[String]("NAME")
-    def slug = column[String]("SLUG")
-    def bio = column[String]("BIO")
-    def email = column[String]("EMAIL")
-    def authLevel = column[Int]("AUTH_LEVEL")
+    def uuid = column[UUID]("USER_UUID", O.PrimaryKey)
+    def username = column[String]("USER_USERNAME")
+    def hashedPassword = column[String]("USER_HASHED_PASSWORD")
+    def name = column[String]("USER_NAME")
+    def slug = column[String]("USER_SLUG")
+    def bio = column[String]("USER_BIO")
+    def email = column[String]("USER_EMAIL")
+    def authLevel = column[Int]("USER_AUTH_LEVEL")
 
-    def * = (id, username, hashedPassword, name, slug, bio, email, authLevel) <> (User.tupled, User.unapply)
+    def * = (uuid, username, hashedPassword, name, slug, bio, email, authLevel) <> (User.tupled, User.unapply)
   }
 
   val users = TableQuery[Users]
@@ -56,7 +57,9 @@ trait UserRepositoryComponent { this: DBComponent with LazyLogging =>
     // Blocking function to ensure that the db has the schema for other calls
     def createTable() = {
       // Block with await
-      val result = Await.ready(db.run(users.schema.create), 5 seconds).value.get
+      val result = Await.ready(
+        db.run(users.schema.create), 5 seconds
+      ).value.get
 
       // Log error or success
       result match {
@@ -65,21 +68,46 @@ trait UserRepositoryComponent { this: DBComponent with LazyLogging =>
       }
     }
 
-    def getAllUsers(): Future[Seq[User]] = db.run(users.result)
+    def deleteTable() = {
+      // Block with await
+      val result = Await.ready(
+        db.run(users.schema.drop), 5 seconds
+      ).value.get
 
-    def getUserById(id: Long): Future[Option[User]] = db.run(users.filter(_.id === id).result.headOption)
+      // Log error or success
+      result match {
+        case Success(value) => logger.debug("user schema dropped")
+        case Failure(e) => logger.error(e.getStackTrace.mkString("\n"))
+      }
+    }
 
+    def getAllUsers(): Future[Seq[User]] = db.run(
+      users.result
+    )
+
+    def getUserById(uuid: UUID): Future[Option[User]] = db.run(
+      users.filter(_.uuid === uuid).result.headOption
+    )
   
-    def getUserByUsername(username: String): Future[Option[User]] = db.run(users.filter(_.username === username).result.headOption)
+    def getUserByUsername(username: String): Future[Option[User]] = db.run(
+      users.filter(_.username === username).result.headOption
+    )
   
-    def createUser(user: User): Future[User] = db.run(
-      (users returning users.map(_.id)
-        into ((user, id) => user.copy(id = id))
-      ) += user)
+    def createUser(user: User): Future[Int] = db.run(
+      users += user
+    )
+
+    def createUsers(newUsers: Seq[User]): Future[Option[Int]] = db.run(
+      users ++= newUsers
+    )
   
-    def deleteUser(id: Long): Future[Int] = db.run(users.filter(_.id === id).delete)
+    def deleteUser(uuid: UUID): Future[Int] = db.run(
+      users.filter(_.uuid === uuid).delete
+    )
   
-    def updateUser(user: User) = db.run(users.filter(_.id === user.id.get).update(user))
+    def updateUser(user: User) = db.run(
+      users.filter(_.uuid === user.uuid).update(user)
+    )
    
   }
 
